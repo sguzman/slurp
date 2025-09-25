@@ -7,12 +7,10 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+"
-  release:
-    types: [published]
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write  # needed to create releases and upload assets
 
 jobs:
   build:
@@ -81,7 +79,7 @@ jobs:
           OUTDIR="dist/${{ matrix.artifact_suffix }}"
           mkdir -p "$OUTDIR"
           cp "target/${{ matrix.target }}/release/${BIN}" "$OUTDIR/"
-          [[ -f README.md ]] && cp README.md "$OUTDIR/"
+          [[ -f README.md ]] && cp README.md "$OUTDIR/" || true
           if [[ "${{ matrix.target }}" == *windows* ]]; then
             7z a "slurp-${{ matrix.artifact_suffix }}.zip" "$OUTDIR/*"
           else
@@ -97,22 +95,25 @@ jobs:
             slurp-${{ matrix.artifact_suffix }}.zip
           if-no-files-found: ignore
 
-  attach-to-release:
-    name: attach artifacts to GitHub Release
+  release:
+    name: create/update GitHub Release and upload assets
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
-    permissions:
-      contents: write
+    if: startsWith(github.ref, 'refs/tags/')  # only when a tag triggered this run
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
-      - name: Publish assets
+      - name: Create or update release and upload assets
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
           files: |
             artifacts/**/slurp-*.tar.gz
             artifacts/**/slurp-*.zip
