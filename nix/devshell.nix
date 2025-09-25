@@ -158,6 +158,14 @@ in
           openssl
         ]);
       }
+      {
+        name = "LD_LIBRARY_PATH";
+        value = pkgs.lib.makeLibraryPath [pkgs.openssl];
+      }
+      {
+        name = "RUSTFLAGS";
+        value = "-C link-arg=-Wl,-rpath,${pkgs.openssl.out}/lib";
+      }
     ];
 
     commands = [
