@@ -6,8 +6,16 @@
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ../Cargo.toml);
   name = cargoToml.package.name;
-  lib = pkgs.lib;
-  toolPkgs = with pkgs; [
+  pkgsU =
+    if (pkgs.config.allowUnfree or false)
+    then pkgs
+    else
+      import pkgs.path {
+        inherit (pkgs) system;
+        config.allowUnfree = true;
+        overlays = pkgs.overlays or [];
+      };
+  toolPkgs = with pkgsU; [
     # Rust toolchain
     rustc
     cargo
@@ -42,8 +50,6 @@
     # SurrealDB CLI (optional, nice for quick checks)
     surrealdb
   ];
-  mkPkgConfigPath = pkgsList:
-    lib.makeSearchPath "lib/pkgconfig" (map lib.getDev pkgsList);
 
   fmtPkg = p: let
     pn =
