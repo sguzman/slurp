@@ -36,6 +36,7 @@
     # Common native deps many crates need
     pkg-config
     openssl
+    cacert
 
     # Handy utilities
     jq
@@ -119,6 +120,22 @@ in
     motd = "";
 
     env = [
+      {
+        name = "OPENSSL_NO_VENDOR";
+        value = "1";
+      }
+      {
+        name = "SSL_CERT_FILE";
+        value = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+      }
+      {
+        name = "NIX_SSL_CERT_FILE";
+        value = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+      }
+      {
+        name = "CURL_CA_BUNDLE";
+        value = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+      }
       {
         name = "SHELL";
         value = "${pkgs.fish}/bin/fish";

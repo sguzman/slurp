@@ -33,4 +33,6 @@ in
     PKG_CONFIG_PATH = mkPkgConfigPath (with pkgs; [
       openssl
     ]);
+
+    OPENSSL_NO_VENDOR = "1";
   }
