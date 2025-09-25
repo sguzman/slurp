@@ -31,9 +31,6 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            artifact_suffix: linux-musl
 
     env:
       CARGO_TERM_COLOR: always
@@ -62,17 +59,6 @@ jobs:
           brew update
           brew install llvm pkg-config
 
-      - name: Prep MUSL toolchain
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-          mkdir -p $HOME/.cargo
-          {
-            echo '[target.x86_64-unknown-linux-musl]'
-            echo 'linker = "musl-gcc"'
-          } >> $HOME/.cargo/config.toml
-
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -96,14 +82,11 @@ jobs:
           mkdir -p "$OUTDIR"
           cp "target/${{ matrix.target }}/release/${BIN}" "$OUTDIR/"
           [[ -f README.md ]] && cp README.md "$OUTDIR/"
-          comp="tar"
           if [[ "${{ matrix.target }}" == *windows* ]]; then
             7z a "slurp-${{ matrix.artifact_suffix }}.zip" "$OUTDIR/*"
-            comp="zip"
           else
             tar -C "dist" -czf "slurp-${{ matrix.artifact_suffix }}.tar.gz" "${{ matrix.artifact_suffix }}"
           fi
-          echo "PKG_COMP=$comp" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
