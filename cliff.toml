@@ -1,0 +1,27 @@
+[changelog]
+header = "# Changelog\n\n"
+body = """
+## {{ version | default(value="Unreleased") }} - {{ now() | date(format="%Y-%m-%d") }}\n
+"""
+
+footer = "\n"
+
+[git]
+# Enable conventional commit parsing
+conventional_commits = true
+# Use tags like v1.2.3
+tag_pattern = "^v\\d+\\.\\d+\\.\\d+$"
+# Group sections nicely
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix",  group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^chore", group = "Chores" },
+  { message = "BREAKING CHANGE", group = "⚠️ Breaking Changes" },
+]
+# Exclude noise if you want
+filter_commits = true
+

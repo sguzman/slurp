@@ -6,6 +6,44 @@ description = "Slurp up json data into surrealdb"
 license-file = "LICENSE"
 repository = "https://github.com/sguzman/slurp"
 
+[package.metadata.release]
+# Versioning behavior
+shared-version = true              # bump all crates together
+dependent-version = "upgrade"      # update internal deps to the new version
+
+
+# Safety / policy
+allow-branch = ["main"]            # only release from main (adjust as needed)
+
+# Tagging / committing
+tag-name = "v{{version}}"
+tag-message = "chore(release): v{{version}}"
+pre-release-commit-message = "chore(release): {{version}}"
+consolidate-commits = true
+push = false                       # keep it local; you push manually
+publish = false
+sign-tag = false                   # change to true if you sign
+
+# Run BEFORE the tag exists; compute range from previous tag to HEAD,
+# tell git-cliff to label the section as the new tag.
+
+pre-release-hook = [
+  "sh", "-c",
+  '''
+  set -e
+  prev="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+  if [ -n "$prev" ]; then
+    # Overwrite the entire changelog using the whole history up to HEAD,
+    # but title the newest section with the upcoming version.
+    git-cliff --tag "v{{version}}" -o CHANGELOG.md
+  else
+    git-cliff --tag "v{{version}}" -o CHANGELOG.md
+  fi
+  git add CHANGELOG.md
+  git commit --amend --no-edit
+  '''
+]
+
 [dependencies]
 anyhow = "1"
 clap = { version = "4.5", features = ["derive"] }
