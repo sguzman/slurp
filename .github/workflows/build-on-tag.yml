@@ -1,12 +1,18 @@
-name: Build on semver tag
+name: Build on semver
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+"
   release:
     types: [published]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -16,31 +22,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Regular Linux (gnu)
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_suffix: linux-gnu
-          # Windows
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_suffix: windows-msvc
-          # macOS
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_suffix: macos
-          # MUSL Linux (static-ish)
           - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             artifact_suffix: linux-musl
 
     env:
       CARGO_TERM_COLOR: always
-      # Build with Cargo.lock and faster linking where applicable
-      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -51,8 +53,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          # mold, clang, pkg-config, openssl headers for reqwest default TLS
           sudo apt-get install -y mold clang pkg-config libssl-dev
+          echo 'RUSTFLAGS=-C link-arg=-fuse-ld=mold' >> $GITHUB_ENV
 
       - name: Install deps (macOS)
         if: runner.os == 'macOS'
@@ -65,13 +67,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools
-          # Ensure linker is available for MUSL target
-          echo "[target.x86_64-unknown-linux-musl]" >> $GITHUB_WORKSPACE/.cargo_config_tmp
-          echo "linker = \"musl-gcc\"" >> $GITHUB_WORKSPACE/.cargo_config_tmp
           mkdir -p $HOME/.cargo
-          cat $GITHUB_WORKSPACE/.cargo_config_tmp >> $HOME/.cargo/config.toml
+          {
+            echo '[target.x86_64-unknown-linux-musl]'
+            echo 'linker = "musl-gcc"'
+          } >> $HOME/.cargo/config.toml
 
-      - name: Cache cargo registry + git + target
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -83,31 +85,25 @@ jobs:
             ${{ runner.os }}-${{ matrix.target }}-cargo-
 
       - name: Build
-        run: |
-          cargo build --locked --release --target ${{ matrix.target }}
+        run: cargo build --locked --release --target ${{ matrix.target }}
 
       - name: Package artifact
         shell: bash
         run: |
           BIN="slurp"
-          case "${{ matrix.target }}" in
-            *windows*) BIN="slurp.exe" ;;
-          esac
-
+          [[ "${{ matrix.target }}" == *windows* ]] && BIN="slurp.exe"
           OUTDIR="dist/${{ matrix.artifact_suffix }}"
           mkdir -p "$OUTDIR"
           cp "target/${{ matrix.target }}/release/${BIN}" "$OUTDIR/"
-
-          # Include helpful extras
-          if [ -f README.md ]; then cp README.md "$OUTDIR/"; fi
-          if [ -f LICENSE ] || [ -f LICENSE.md ]; then cp LICENSE* "$OUTDIR/" 2>/dev/null || true; fi
-
-          # Tar/zip per OS convention
+          [[ -f README.md ]] && cp README.md "$OUTDIR/"
+          comp="tar"
           if [[ "${{ matrix.target }}" == *windows* ]]; then
             7z a "slurp-${{ matrix.artifact_suffix }}.zip" "$OUTDIR/*"
+            comp="zip"
           else
             tar -C "dist" -czf "slurp-${{ matrix.artifact_suffix }}.tar.gz" "${{ matrix.artifact_suffix }}"
           fi
+          echo "PKG_COMP=$comp" >> $GITHUB_ENV
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -123,6 +119,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
