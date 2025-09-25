@@ -6,6 +6,9 @@
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ../Cargo.toml);
   name = cargoToml.package.name;
+  lib = pkgs.lib;
+  mkPkgConfigPath = pkgsList:
+    lib.makeSearchPath "lib/pkgconfig" (map lib.getDev pkgsList);
   pkgsU =
     if (pkgs.config.allowUnfree or false)
     then pkgs
@@ -131,6 +134,12 @@ in
       {
         name = "OPENSSL_INCLUDE_DIR";
         value = "${pkgs.openssl.dev}/include";
+      }
+      {
+        name = "PKG_CONFIG_PATH";
+        value = mkPkgConfigPath (with pkgs; [
+          openssl
+        ]);
       }
     ];
 

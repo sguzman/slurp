@@ -6,7 +6,10 @@
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ../../../Cargo.toml);
   name = cargoToml.package.name;
+  lib = pkgs.lib;
   naersk = inputs.naersk;
+  mkPkgConfigPath = pkgsList:
+    lib.makeSearchPath "lib/pkgconfig" (map lib.getDev pkgsList);
 in
   naersk.lib.${pkgs.system}.buildPackage {
     pname = name;
@@ -26,4 +29,8 @@ in
     buildInputs = with pkgs; [
       openssl
     ];
+
+    PKG_CONFIG_PATH = mkPkgConfigPath (with pkgs; [
+      openssl
+    ]);
   }
