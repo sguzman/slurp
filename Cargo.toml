@@ -2,6 +2,9 @@
 name = "slurp"
 version = "0.1.0"
 edition = "2024"
+description = "Slurp up json data into surrealdb"
+license-file = "LICENSE"
+repository = "https://github.com/sguzman/slurp"
 
 [dependencies]
 anyhow = "1"
