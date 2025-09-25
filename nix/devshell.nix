@@ -127,47 +127,6 @@ in
         name = "OPENSSL_INCLUDE_DIR";
         value = "${pkgs.openssl.dev}/include";
       }
-      {
-        # bindgen looks for libclang here
-        name = "LIBCLANG_PATH";
-        value = "${pkgs.lib.getLib pkgs.llvmPackages.libclang}/lib";
-      }
-      {
-        # headers used by bindgen/clang (resource dir includes std headers)
-        name = "BINDGEN_EXTRA_CLANG_ARGS";
-        value = "-I${pkgs.llvmPackages.clang}/lib/clang/${pkgs.llvmPackages.clang.version}/include";
-      }
-      {
-        name = "PKG_CONFIG_PATH";
-        value = mkPkgConfigPath (with pkgs; [
-          tesseract
-          leptonica
-          openssl
-          opencv
-        ]);
-      }
-      {
-        # optional, useful at runtime if you use OCR
-        name = "TESSDATA_PREFIX";
-        value = "${pkgs.tesseract}/share/tessdata";
-      }
-      {
-        name = "CC";
-        value = "${pkgs.clang}/bin/clang";
-      }
-      {
-        name = "CXX";
-        value = "${pkgs.clang}/bin/clang++";
-      }
-      # make sure any broken wrapper doesn't get used
-      {
-        name = "SCCACHE_DISABLE";
-        value = "1";
-      }
-      {
-        name = "LD_LIBRARY_PATH";
-        value = lib.makeLibraryPath runtimeLibs;
-      }
     ];
 
     commands = [
