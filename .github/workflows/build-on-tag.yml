@@ -1,0 +1,138 @@
+name: Build on semver tag
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: build ${{ matrix.target }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Regular Linux (gnu)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_suffix: linux-gnu
+          # Windows
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_suffix: windows-msvc
+          # macOS
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_suffix: macos
+          # MUSL Linux (static-ish)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_suffix: linux-musl
+
+    env:
+      CARGO_TERM_COLOR: always
+      # Build with Cargo.lock and faster linking where applicable
+      RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          # mold, clang, pkg-config, openssl headers for reqwest default TLS
+          sudo apt-get install -y mold clang pkg-config libssl-dev
+
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install llvm pkg-config
+
+      - name: Prep MUSL toolchain
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          # Ensure linker is available for MUSL target
+          echo "[target.x86_64-unknown-linux-musl]" >> $GITHUB_WORKSPACE/.cargo_config_tmp
+          echo "linker = \"musl-gcc\"" >> $GITHUB_WORKSPACE/.cargo_config_tmp
+          mkdir -p $HOME/.cargo
+          cat $GITHUB_WORKSPACE/.cargo_config_tmp >> $HOME/.cargo/config.toml
+
+      - name: Cache cargo registry + git + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Build
+        run: |
+          cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          BIN="slurp"
+          case "${{ matrix.target }}" in
+            *windows*) BIN="slurp.exe" ;;
+          esac
+
+          OUTDIR="dist/${{ matrix.artifact_suffix }}"
+          mkdir -p "$OUTDIR"
+          cp "target/${{ matrix.target }}/release/${BIN}" "$OUTDIR/"
+
+          # Include helpful extras
+          if [ -f README.md ]; then cp README.md "$OUTDIR/"; fi
+          if [ -f LICENSE ] || [ -f LICENSE.md ]; then cp LICENSE* "$OUTDIR/" 2>/dev/null || true; fi
+
+          # Tar/zip per OS convention
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            7z a "slurp-${{ matrix.artifact_suffix }}.zip" "$OUTDIR/*"
+          else
+            tar -C "dist" -czf "slurp-${{ matrix.artifact_suffix }}.tar.gz" "${{ matrix.artifact_suffix }}"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slurp-${{ matrix.artifact_suffix }}
+          path: |
+            slurp-${{ matrix.artifact_suffix }}.tar.gz
+            slurp-${{ matrix.artifact_suffix }}.zip
+          if-no-files-found: ignore
+
+  attach-to-release:
+    name: attach artifacts to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Publish assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/slurp-*.tar.gz
+            artifacts/**/slurp-*.zip
+
