@@ -15,7 +15,7 @@ in
     pname = name;
     version = cargoToml.package.version;
 
-    src = ../../../;
+    src = ../../..;
 
     cargoToml = ../../../Cargo.toml;
     cargoLock = ../../../Cargo.lock;
