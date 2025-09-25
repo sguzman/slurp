@@ -29,7 +29,6 @@
     # Linker/tooling for fast builds
     mold
     clang
-    llvmPackages.bintools
 
     # Common native deps many crates need
     pkg-config
